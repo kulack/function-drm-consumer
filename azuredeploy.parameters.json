@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "logicAppName": {
-      "value": "MonitorConsumer",
+      "value": "function-drm-consumer0000",
       "metadata": {
         "description": "Name of the Logic App."
       }

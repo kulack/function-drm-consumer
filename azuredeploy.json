@@ -4,7 +4,7 @@
   "parameters": {
     "logicAppName": {
       "type": "string",
-      "defaultValue": "MonitorConsumer",
+      "defaultValue": "function-drm-consumer0000",
       "metadata": {
         "description": "Name of the Logic App."
       }
