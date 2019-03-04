@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "value": "MonitorConsumer",
+      "metadata": {
+        "description": "Name of the Logic App."
+      }
+    },
+    "When_a_message_is_received_in_a_queue_(auto-complete)Frequency": {
+      "value": "Minute"
+    },
+    "When_a_message_is_received_in_a_queue_(auto-complete)Interval": {
+      "value": 1
+    },
+    "documentdb_name": {
+      "value": "timeseries"
+    },
+    "documentdb_displayName": {
+      "value": "cosmosdbconnection"
+    },
+    "documentdb_databaseAccount": {
+      "value": "function-drm-monitor0000"
+    },
+    "documentdb_accessKey": {
+      "value": null
+    },
+    "servicebus_name": {
+      "value": "functiondrmmonitor0000"
+    },
+    "servicebus_displayName": {
+      "value": "servicebusconnection"
+    },
+    "servicebus_connectionString": {
+      "value": null
+    }
+  }
+}

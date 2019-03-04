@@ -1,0 +1,278 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "type": "string",
+      "defaultValue": "MonitorConsumer",
+      "metadata": {
+        "description": "Name of the Logic App."
+      }
+    },
+    "logicAppLocation": {
+      "type": "string",
+      "defaultValue": null,
+      "allowedValues": [
+        "eastasia",
+        "southeastasia",
+        "centralus",
+        "eastus",
+        "eastus2",
+        "westus",
+        "northcentralus",
+        "southcentralus",
+        "northeurope",
+        "westeurope",
+        "japanwest",
+        "japaneast",
+        "brazilsouth",
+        "australiaeast",
+        "australiasoutheast",
+        "westcentralus",
+        "westus2"
+      ],
+      "metadata": {
+        "description": "Location of the Logic App."
+      }
+    },
+    "When_a_message_is_received_in_a_queue_(auto-complete)Frequency": {
+      "type": "string",
+      "defaultValue": "Minute",
+      "metadata": {
+        "description": "Frequency unit between refreshes from the service bus queue"
+      }
+    },
+    "When_a_message_is_received_in_a_queue_(auto-complete)Interval": {
+      "type": "int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "Interval used between refreshes from the service bus queue"
+      }
+    },
+    "documentdb_name": {
+      "type": "string",
+      "defaultValue": "timeseries",
+      "metadata": {
+        "description": "The name of the Cosmos DB database"
+      }
+    },
+    "documentdb_displayName": {
+      "type": "string",
+      "defaultValue": "cosmosdbconnection",
+      "metadata": {
+        "description": "A simple internal name for the connection object to the Cosmos DB database"
+      }
+    },
+    "documentdb_databaseAccount": {
+      "type": "string",
+      "defaultValue": "function-drm-monitor0000",
+      "metadata": {
+        "description": "Name of the account without 'documents.azure.com' part"
+      }
+    },
+    "documentdb_accessKey": {
+      "type": "securestring",
+      "defaultValue": null,
+      "metadata": {
+        "description": "Primary or Secondary Key from the Cosmos DB (The Keys section in Azure Portal's Cosmos DB explorer)"
+      }
+    },
+    "servicebus_name": {
+      "type": "string",
+      "defaultValue": "functiondrmmonitor0000",
+      "metadata": {
+        "description": "The name of the service bus used for incoming messages"
+      }
+    },
+    "servicebus_displayName": {
+      "type": "string",
+      "defaultValue": "servicebusconnection",
+      "metadata": {
+        "description": "A simple internal name for the connection to the Service Bus queue"
+      }
+    },
+    "servicebus_connectionString": {
+      "type": "securestring",
+      "defaultValue": null,
+      "metadata": {
+        "description": "Azure Service Bus Connection String (The Shared Access Policies section in Azure Portal's Service Bus Namespace explorer"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('logicAppLocation')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('documentdb_name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('servicebus_name'))]"
+      ],
+      "properties": {
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_a_message_is_received_in_a_queue_(auto-complete)": {
+              "recurrence": {
+                "frequency": "[parameters('When_a_message_is_received_in_a_queue_(auto-complete)Frequency')]",
+                "interval": "[parameters('When_a_message_is_received_in_a_queue_(auto-complete)Interval')]"
+              },
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['servicebus']['connectionId']"
+                  }
+                },
+                "method": "get",
+                "path": "/@{encodeURIComponent(encodeURIComponent('drmposted'))}/messages/head",
+                "queries": {
+                  "queueType": "Main"
+                }
+              }
+            }
+          },
+          "actions": {
+            "Parse_JSON": {
+              "runAfter": {},
+              "type": "ParseJson",
+              "inputs": {
+                "content": "@decodeBase64(triggerBody()?['ContentData'])",
+                "schema": {
+                  "properties": {
+                    "DataPoint": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "group": {
+                      "type": "string"
+                    },
+                    "operation": {
+                      "type": "string"
+                    },
+                    "simplifiedTopic": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    },
+                    "topic": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "Switch": {
+              "runAfter": {
+                "Parse_JSON": [
+                  "Succeeded"
+                ]
+              },
+              "cases": {
+                "Case": {
+                  "case": "DataPoint",
+                  "actions": {
+                    "Create_or_update_document": {
+                      "runAfter": {},
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "body": "@body('Parse_JSON')?['DataPoint']",
+                        "headers": {
+                          "x-ms-documentdb-raw-partitionkey": "\"@{body('Parse_JSON')?['DataPoint']?['id']}\""
+                        },
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['documentdb']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "path": "/dbs/@{encodeURIComponent('timeseries')}/colls/@{encodeURIComponent('DataPoint')}/docs"
+                      }
+                    }
+                  }
+                }
+              },
+              "default": {
+                "actions": {
+                  "Terminate": {
+                    "runAfter": {},
+                    "type": "Terminate",
+                    "inputs": {
+                      "runStatus": "Succeeded"
+                    }
+                  }
+                }
+              },
+              "expression": "@body('Parse_JSON')?['simplifiedTopic']",
+              "type": "Switch"
+            }
+          },
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "documentdb": {
+                "id": "[concat('/subscriptions/',subscription().subscriptionId,'/providers/Microsoft.Web/locations/',parameters('logicAppLocation'),'/managedApis/documentdb')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('documentdb_name'))]",
+                "connectionName": "[parameters('documentdb_name')]"
+              },
+              "servicebus": {
+                "id": "[concat('/subscriptions/',subscription().subscriptionId,'/providers/Microsoft.Web/locations/',parameters('logicAppLocation'),'/managedApis/servicebus')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('servicebus_name'))]",
+                "connectionName": "[parameters('servicebus_name')]"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/connections",
+      "apiVersion": "2016-06-01",
+      "location": "[parameters('logicAppLocation')]",
+      "name": "[parameters('servicebus_name')]",
+      "properties": {
+        "api": {
+          "id": "[concat('/subscriptions/',subscription().subscriptionId,'/providers/Microsoft.Web/locations/',parameters('logicAppLocation'),'/managedApis/servicebus')]"
+        },
+        "displayName": "[parameters('servicebus_displayName')]",
+        "parameterValues": {
+          "connectionString": "[parameters('servicebus_connectionString')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/connections",
+      "apiVersion": "2016-06-01",
+      "location": "[parameters('logicAppLocation')]",
+      "name": "[parameters('documentdb_name')]",
+      "properties": {
+        "api": {
+          "id": "[concat('/subscriptions/',subscription().subscriptionId,'/providers/Microsoft.Web/locations/',parameters('logicAppLocation'),'/managedApis/documentdb')]"
+        },
+        "displayName": "[parameters('documentdb_displayName')]",
+        "parameterValues": {
+          "databaseAccount": "[parameters('documentdb_databaseAccount')]",
+          "accessKey": "[parameters('documentdb_accessKey')]"
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}

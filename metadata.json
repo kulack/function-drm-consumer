@@ -1,0 +1,10 @@
+{
+  "$schema": "https://aka.ms/azure-quickstart-templates-metadata-schema#",
+  "type": "QuickStart",
+  "icon": "logic",
+  "itemDisplayName": "Digi Remote Manager Azure Integration Sample (part2)",
+  "description": "This template helps create a Logic app triggers with a message in a service bus queue and copies the message (if matching a particular type) to a Cosmos DB. Add additional triggers and actions in order to customize to your solution.",
+  "summary": "Process Digi Remote Manager monitor messages from a service bus queue and insert them in Cosmos DB",
+  "githubUsername": "kulack",
+  "dateUpdated": "2019-03-04"
+}
