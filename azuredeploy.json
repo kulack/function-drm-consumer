@@ -193,7 +193,8 @@
                       "inputs": {
                         "body": "@body('Parse_JSON')?['DataPoint']",
                         "headers": {
-                          "x-ms-documentdb-raw-partitionkey": "\"@{body('Parse_JSON')?['DataPoint']?['id']}\""
+                          "x-ms-documentdb-raw-partitionkey": "\"@{body('Parse_JSON')?['DataPoint']?['id']}\"",
+                         "x-ms-documentdb-is-upsert": true
                         },
                         "host": {
                           "connection": {
